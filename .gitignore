@@ -1,0 +1,17 @@
+# Local Codex/agent state
+.agents/
+.codex/
+
+# Generated outputs and scratch files
+outputs/
+tmp/
+
+# MATLAB autosave and backup files
+*.asv
+*.m~
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+~$*
