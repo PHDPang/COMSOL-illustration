@@ -1,24 +1,28 @@
-%% Reproduce Fig. 2(b)-style band dispersion from COMSOL eigenfrequency scan
-% Data columns:
-% 1 delta, 2 k ratio, 3 complex eigenfrequency, 4 Q, 5-8 Stokes S0-S3.
-% The paired degenerate modes are taken as the 5th and 6th eigen-solutions
-% within each fixed (delta, k) scan point.
+%% 根据 COMSOL 本征频率扫描结果绘制论文图 2(b) 风格的能带
+% 数据列：1-delta，2-k/ratio，3-复本征频率，4-Q，5~8-S0~S3。
+% 对每个固定的 (delta, k) 扫描点，选取第 5、6 个本征解作为目标模式。
 
 clear; clc; close all;
 
-xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\S2n Symmetry\S6 Symmetry\Band Structure\Continuous\Nonreciprocity,delta=0&0.08,k=(-0.06,0.06,length=0.005).xlsx";
+xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\S2n Symmetry\S6 Symmetry\Band Structure\Continuous\Nonreciprocity,delta=0&0.08,k=(-0.04,0.04,length=0.005).xlsx";
 outDir = fullfile(pwd, "outputs");
+% 若输出目录不存在则自动创建。
 if ~exist(outDir, "dir")
     mkdir(outDir);
 end
 
-modePair = [5, 6];       % 1-based eigenmode indices in each (delta, k) block
+modePair = [5, 6];       % 每个 (delta, k) 数据块内的本征模式序号
 delta0 = 0;
 deltaB = 0.08;
+c_const = 299792458;     % 真空光速，单位：m/s
+lattice = 840e-9;        % 晶格常数，单位：m
+f0 = c_const / lattice / 1e12;  % 归一化频率，单位：THz
 
+% 读取原始单元格，并删除整行为空的数据。
 raw = readcell(xlsxPath);
 raw = raw(~all(cellfun(@isEmptyCell, raw), 2), :);
 
+% 将各列转换为数值；复本征频率单独解析为复数。
 delta = cellfun(@toDouble, raw(:, 1));
 k = cellfun(@toDouble, raw(:, 2));
 freqComplex = cellfun(@parseComplex, raw(:, 3));
@@ -33,7 +37,10 @@ T = table(delta(valid), k(valid), freqComplex(valid), qFactor(valid), ...
     s0(valid), s1(valid), s2(valid), s3(valid), find(valid), ...
     'VariableNames', {'delta','k','freq','Q','S0','S1','S2','S3','sourceRow'});
 T.freqReal = real(T.freq);
+% 消除 Excel 浮点存储误差，确保理论上相同的 k 被归入同一组。
+T.k = round(T.k, 12);
 
+% 保留源文件中的本征解顺序，并在每个 (delta, k) 组内重新编号。
 T = sortrows(T, {'delta','k','sourceRow'});
 [G, ~] = findgroups(T.delta, T.k);
 T.modeIndex = zeros(height(T), 1);
@@ -42,6 +49,7 @@ for g = 1:max(G)
     T.modeIndex(rows) = (1:numel(rows)).';
 end
 
+% 分别提取 delta=0 和 delta=0.08 时的上下能带。
 band0 = extractBandPair(T, delta0, modePair);
 bandB = extractBandPair(T, deltaB, modePair);
 
@@ -52,10 +60,22 @@ fprintf("delta = %.3g, k = 0: lower = %.6f, upper = %.6f, splitting = %.6f\n", .
     deltaB, gammaValue(bandB.k, bandB.lower), gammaValue(bandB.k, bandB.upper), ...
     gammaValue(bandB.k, bandB.upper) - gammaValue(bandB.k, bandB.lower));
 
+% 将频率除以 f0，后续绘图统一使用无量纲频率。
+band0.lower = band0.lower / f0;
+band0.upper = band0.upper / f0;
+bandB.lower = bandB.lower / f0;
+bandB.upper = bandB.upper / f0;
+
+% 仅对绘图曲线进行保形插值，避免改变原始数据及其物理含义。
+interpFactor = 10;
+plotBand0 = interpolateBandForPlot(band0, interpFactor);
+plotBandB = interpolateBandForPlot(bandB, interpFactor);
+
 fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [4 4 8.5 8.0]);
 ax = axes(fig);
 ax.Position = [0.18 0.42 0.76 0.50];
 hold(ax, 'on');
+% 隐藏交互工具栏，避免导出图片时出现额外控件。
 try
     ax.Toolbar.Visible = 'off';
 catch
@@ -65,18 +85,19 @@ try
 catch
 end
 
-% Paper-style colors: black for delta = 0, red/blue for the lifted pair.
+% 参照论文配色：delta=0 为黑色，解除简并后的上下支分别为红、蓝色。
 black = [0.10, 0.10, 0.10];
 red = [0.95, 0.05, 0.05];
 blue = [0.05, 0.15, 0.95];
 gray = [0.45, 0.45, 0.45];
 
-hDelta0 = plot(ax, band0.k, band0.upper, '-', 'Color', black, 'LineWidth', 1.05);
-plot(ax, band0.k, band0.lower, '-', 'Color', black, 'LineWidth', 1.05, ...
+hDelta0 = plot(ax, plotBand0.k, plotBand0.upper, '-', 'Color', black, 'LineWidth', 1.05);
+plot(ax, plotBand0.k, plotBand0.lower, '-', 'Color', black, 'LineWidth', 1.05, ...
     'HandleVisibility', 'off');
-hUpper = plot(ax, bandB.k, bandB.upper, '-', 'Color', red, 'LineWidth', 1.35);
-hLower = plot(ax, bandB.k, bandB.lower, '-', 'Color', blue, 'LineWidth', 1.35);
+hUpper = plot(ax, plotBandB.k, plotBandB.upper, '-', 'Color', red, 'LineWidth', 1.35);
+hLower = plot(ax, plotBandB.k, plotBandB.lower, '-', 'Color', blue, 'LineWidth', 1.35);
 
+% 提取并标记 Gamma 点处的简并位置及分裂后的上下支。
 kGamma = 0;
 f0Gamma = mean([gammaValue(band0.k, band0.lower), gammaValue(band0.k, band0.upper)]);
 fUpperGamma = gammaValue(bandB.k, bandB.upper);
@@ -91,6 +112,7 @@ plot(ax, kGamma, fLowerGamma, 'o', 'MarkerSize', 5.5, ...
 
 xline(ax, kGamma, '--', 'Color', [0.68, 0.68, 0.68], 'LineWidth', 0.9);
 
+% 根据全部能带数据统一设置显示范围，并预留少量纵向边距。
 xmin = min([band0.k; bandB.k]);
 xmax = max([band0.k; bandB.k]);
 xlim(ax, [xmin, xmax]);
@@ -105,11 +127,23 @@ ax.FontName = 'Arial';
 ax.FontSize = 8;
 ax.TickDir = 'in';
 ax.Layer = 'top';
-ax.XTick = [xmin, 0, xmax];
-ax.XTickLabel = {'M', '\Gamma', 'K'};
+
+% 横坐标每隔 0.02 设置刻度，并将高对称点标记放在数值下一行。
+xTicks = xmin:0.02:xmax;
+xTickLabels = arrayfun(@(x) sprintf('%.2f', x), xTicks, ...
+    'UniformOutput', false);
+[~, idxM] = min(abs(xTicks - xmin));
+[~, idxGamma] = min(abs(xTicks));
+[~, idxK] = min(abs(xTicks - xmax));
+xTickLabels{idxM} = sprintf('%.2f\\newlineM', xTicks(idxM));
+xTickLabels{idxGamma} = sprintf('%.2f\\newline\\Gamma', xTicks(idxGamma));
+xTickLabels{idxK} = sprintf('%.2f\\newlineK', xTicks(idxK));
+ax.XTick = xTicks;
+ax.XTickLabel = xTickLabels;
+ax.TickLabelInterpreter = 'tex';
 
 xlabel(ax, 'k (2\pi/a)', 'FontName', 'Arial', 'FontSize', 9);
-ylabel(ax, 'Re(\omega) (THz)', 'FontName', 'Arial', 'FontSize', 9);
+ylabel(ax, 'f/f_0', 'FontName', 'Arial', 'FontSize', 9);
 
 leg = legend(ax, [hDelta0, hUpper, hLower], ...
     {'\delta = 0', 'Upper band, \delta = 0.08', 'Lower band, \delta = 0.08'}, ...
@@ -121,6 +155,7 @@ leg.FontSize = 7;
 text(ax, 0.02, 0.94, '(b)', 'Units', 'normalized', ...
     'FontName', 'Arial', 'FontWeight', 'bold', 'FontSize', 10);
 
+% 同时导出高分辨率 PNG 和矢量 PDF。
 pngPath = fullfile(outDir, "fig2b_upper_lower_bands_matlab.png");
 pdfPath = fullfile(outDir, "fig2b_upper_lower_bands_matlab.pdf");
 exportgraphics(fig, pngPath, 'Resolution', 600);
@@ -130,7 +165,18 @@ print(fig, pdfPath, '-dpdf', '-painters');
 fprintf("Saved PNG: %s\n", pngPath);
 fprintf("Saved PDF: %s\n", pdfPath);
 
+function plotBand = interpolateBandForPlot(band, interpFactor)
+    % 使用保形分段三次插值加密横坐标，减少折线感并抑制非物理过冲。
+    pointCount = (height(band) - 1) * interpFactor + 1;
+    kFine = linspace(band.k(1), band.k(end), pointCount).';
+    lowerFine = interp1(band.k, band.lower, kFine, 'pchip');
+    upperFine = interp1(band.k, band.upper, kFine, 'pchip');
+    plotBand = table(kFine, lowerFine, upperFine, ...
+        'VariableNames', {'k','lower','upper'});
+end
+
 function band = extractBandPair(T, deltaValue, modePair)
+    % 筛选指定 delta 和模式序号，并在每个 k 点按实频率划分上下支。
     tol = 1e-9;
     sub = T(abs(T.delta - deltaValue) < tol & ismember(T.modeIndex, modePair), :);
     if isempty(sub)
@@ -157,6 +203,7 @@ function band = extractBandPair(T, deltaValue, modePair)
 end
 
 function y0 = gammaValue(k, y)
+    % 返回最接近 k=0 的 Gamma 点数值，并检查该点确实存在。
     [dmin, idx] = min(abs(k));
     if dmin > 1e-10
         error("No Gamma-point k = 0 row was found.");
@@ -165,6 +212,7 @@ function y0 = gammaValue(k, y)
 end
 
 function value = toDouble(x)
+    % 兼容 Excel 中的数值单元格、文本数值和空单元格。
     if isnumeric(x)
         value = double(x);
     elseif ismissing(string(x)) || strlength(strtrim(string(x))) == 0
@@ -175,6 +223,7 @@ function value = toDouble(x)
 end
 
 function z = parseComplex(x)
+    % 将 COMSOL 导出的复数字符串统一转换为 MATLAB 复数。
     if isnumeric(x)
         z = complex(double(x), 0);
         return;
@@ -195,6 +244,7 @@ function z = parseComplex(x)
         return;
     end
 
+    % str2double 失败时，用正则表达式解析“实部+虚部i”的形式。
     token = regexp(s, '^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)([+-]\d*\.?\d+(?:[eE][+-]?\d+)?)i$', ...
         'tokens', 'once');
     if isempty(token)
@@ -205,6 +255,7 @@ function z = parseComplex(x)
 end
 
 function tf = isEmptyCell(x)
+    % 判断不同数据类型下的空单元格。
     tf = isempty(x) || (isstring(x) && ismissing(x)) || ...
         (ischar(x) && isempty(strtrim(x))) || ...
         (isnumeric(x) && isscalar(x) && isnan(x));
