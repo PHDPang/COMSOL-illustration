@@ -1,4 +1,4 @@
-%% 根据 COMSOL 本征频率扫描结果绘制论文图 2(b) 风格的能带
+%% 根据 COMSOL 本征频率扫描结果绘制复本征频率的实部和虚部
 % 数据列：1-delta，2-k/ratio，3-复本征频率，4-Q，5~8-S0~S3。
 % 对每个固定的 (delta, k) 扫描点，选取第 5、6 个本征解作为目标模式。
 
@@ -60,6 +60,12 @@ fprintf("delta = %.3g, k = 0: lower = %.6f, upper = %.6f, splitting = %.6f\n", .
     deltaB, gammaValue(bandB.k, bandB.lower), gammaValue(bandB.k, bandB.upper), ...
     gammaValue(bandB.k, bandB.upper) - gammaValue(bandB.k, bandB.lower));
 
+% 保留本征频率虚部的原始 THz 数据，不进行归一化。
+imagBand0 = table(band0.k, band0.lowerImag, band0.upperImag, ...
+    'VariableNames', {'k','lower','upper'});
+imagBandB = table(bandB.k, bandB.lowerImag, bandB.upperImag, ...
+    'VariableNames', {'k','lower','upper'});
+
 % 将频率除以 f0，后续绘图统一使用无量纲频率。
 band0.lower = band0.lower / f0;
 band0.upper = band0.upper / f0;
@@ -70,8 +76,12 @@ bandB.upper = bandB.upper / f0;
 interpFactor = 10;
 plotBand0 = interpolateBandForPlot(band0, interpFactor);
 plotBandB = interpolateBandForPlot(bandB, interpFactor);
+plotImagBand0 = interpolateBandForPlot(imagBand0, interpFactor);
+plotImagBandB = interpolateBandForPlot(imagBandB, interpFactor);
 
-fig = figure('Color', 'w', 'Units', 'centimeters', 'Position', [4 4 8.5 8.0]);
+fig = figure(1);
+set(fig, 'Name', 'Real part (a)', 'NumberTitle', 'off', ...
+    'Color', 'w', 'Units', 'centimeters', 'Position', [4 4 8.5 8.0]);
 ax = axes(fig);
 ax.Position = [0.18 0.42 0.76 0.50];
 hold(ax, 'on');
@@ -152,18 +162,94 @@ leg.Units = 'normalized';
 leg.Position = [0.12 0.11 0.82 0.14];
 leg.FontSize = 7;
 
-text(ax, 0.02, 0.94, '(b)', 'Units', 'normalized', ...
+text(ax, 0.02, 0.94, '(a)', 'Units', 'normalized', ...
     'FontName', 'Arial', 'FontWeight', 'bold', 'FontSize', 10);
 
 % 同时导出高分辨率 PNG 和矢量 PDF。
-pngPath = fullfile(outDir, "fig2b_upper_lower_bands_matlab.png");
-pdfPath = fullfile(outDir, "fig2b_upper_lower_bands_matlab.pdf");
+pngPath = fullfile(outDir, "fig2a_real_upper_lower_bands_matlab.png");
+pdfPath = fullfile(outDir, "fig2a_real_upper_lower_bands_matlab.pdf");
 exportgraphics(fig, pngPath, 'Resolution', 600);
 set(fig, 'Renderer', 'painters');
 print(fig, pdfPath, '-dpdf', '-painters');
 
 fprintf("Saved PNG: %s\n", pngPath);
 fprintf("Saved PDF: %s\n", pdfPath);
+
+% 绘制复本征频率虚部，样式与实部图保持一致。
+figImag = figure(2);
+set(figImag, 'Name', 'Imaginary part (b)', 'NumberTitle', 'off', ...
+    'Color', 'w', 'Units', 'centimeters', 'Position', [13 4 8.5 8.0]);
+axImag = axes(figImag);
+axImag.Position = [0.18 0.42 0.76 0.50];
+hold(axImag, 'on');
+try
+    axImag.Toolbar.Visible = 'off';
+catch
+end
+try
+    disableDefaultInteractivity(axImag);
+catch
+end
+
+hImagDelta0 = plot(axImag, plotImagBand0.k, plotImagBand0.upper, '-', ...
+    'Color', black, 'LineWidth', 1.05);
+plot(axImag, plotImagBand0.k, plotImagBand0.lower, '-', ...
+    'Color', black, 'LineWidth', 1.05, 'HandleVisibility', 'off');
+hImagUpper = plot(axImag, plotImagBandB.k, plotImagBandB.upper, '-', ...
+    'Color', red, 'LineWidth', 1.35);
+hImagLower = plot(axImag, plotImagBandB.k, plotImagBandB.lower, '-', ...
+    'Color', blue, 'LineWidth', 1.35);
+
+% 标记 Gamma 点处各模式的原始虚部。
+plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.upper), 'o', ...
+    'MarkerSize', 5.5, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
+plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.lower), 'o', ...
+    'MarkerSize', 5.5, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
+plot(axImag, kGamma, gammaValue(imagBandB.k, imagBandB.upper), 'o', ...
+    'MarkerSize', 5.5, 'MarkerFaceColor', red, 'MarkerEdgeColor', red);
+plot(axImag, kGamma, gammaValue(imagBandB.k, imagBandB.lower), 'o', ...
+    'MarkerSize', 5.5, 'MarkerFaceColor', blue, 'MarkerEdgeColor', blue);
+xline(axImag, kGamma, '--', 'Color', [0.68, 0.68, 0.68], 'LineWidth', 0.9);
+
+xlim(axImag, [xmin, xmax]);
+imagValues = [imagBand0.lower; imagBand0.upper; imagBandB.lower; imagBandB.upper];
+imagPad = 0.08 * range(imagValues);
+if imagPad == 0
+    imagPad = max(abs(imagValues(1)) * 0.08, eps);
+end
+ylim(axImag, [min(imagValues) - imagPad, max(imagValues) + imagPad]);
+
+box(axImag, 'on');
+axImag.LineWidth = 0.9;
+axImag.FontName = 'Arial';
+axImag.FontSize = 8;
+axImag.TickDir = 'in';
+axImag.Layer = 'top';
+axImag.XTick = xTicks;
+axImag.XTickLabel = xTickLabels;
+axImag.TickLabelInterpreter = 'tex';
+
+xlabel(axImag, 'k (2\pi/a)', 'FontName', 'Arial', 'FontSize', 9);
+ylabel(axImag, 'Im(f) (THz)', 'FontName', 'Arial', 'FontSize', 9);
+
+legImag = legend(axImag, [hImagDelta0, hImagUpper, hImagLower], ...
+    {'\delta = 0', 'Upper band, \delta = 0.08', 'Lower band, \delta = 0.08'}, ...
+    'Orientation', 'horizontal', 'Box', 'off', 'NumColumns', 2);
+legImag.Units = 'normalized';
+legImag.Position = [0.12 0.11 0.82 0.14];
+legImag.FontSize = 7;
+
+text(axImag, 0.02, 0.94, '(b)', 'Units', 'normalized', ...
+    'FontName', 'Arial', 'FontWeight', 'bold', 'FontSize', 10);
+
+pngImagPath = fullfile(outDir, "fig2b_imag_upper_lower_bands_matlab.png");
+pdfImagPath = fullfile(outDir, "fig2b_imag_upper_lower_bands_matlab.pdf");
+exportgraphics(figImag, pngImagPath, 'Resolution', 600);
+set(figImag, 'Renderer', 'painters');
+print(figImag, pdfImagPath, '-dpdf', '-painters');
+
+fprintf("Saved PNG: %s\n", pngImagPath);
+fprintf("Saved PDF: %s\n", pdfImagPath);
 
 function plotBand = interpolateBandForPlot(band, interpFactor)
     % 使用保形分段三次插值加密横坐标，减少折线感并抑制非物理过冲。
@@ -176,7 +262,7 @@ function plotBand = interpolateBandForPlot(band, interpFactor)
 end
 
 function band = extractBandPair(T, deltaValue, modePair)
-    % 筛选指定 delta 和模式序号，并在每个 k 点按实频率划分上下支。
+    % 按实部划分上下支，并同步保留每条能带对应的虚部。
     tol = 1e-9;
     sub = T(abs(T.delta - deltaValue) < tol & ismember(T.modeIndex, modePair), :);
     if isempty(sub)
@@ -187,19 +273,24 @@ function band = extractBandPair(T, deltaValue, modePair)
     kVals = unique(sub.k, 'sorted');
     lower = nan(size(kVals));
     upper = nan(size(kVals));
+    lowerImag = nan(size(kVals));
+    upperImag = nan(size(kVals));
     for ii = 1:numel(kVals)
         rows = sub(abs(sub.k - kVals(ii)) < tol, :);
         if height(rows) ~= 2
             error("Expected two selected modes at delta = %.6g, k = %.6g, found %d.", ...
                 deltaValue, kVals(ii), height(rows));
         end
-        pair = sort(rows.freqReal);
-        lower(ii) = pair(1);
-        upper(ii) = pair(2);
+        [pairReal, order] = sort(rows.freqReal);
+        pairFreq = rows.freq(order);
+        lower(ii) = pairReal(1);
+        upper(ii) = pairReal(2);
+        lowerImag(ii) = imag(pairFreq(1));
+        upperImag(ii) = imag(pairFreq(2));
     end
 
-    band = table(kVals, lower, upper, ...
-        'VariableNames', {'k','lower','upper'});
+    band = table(kVals, lower, upper, lowerImag, upperImag, ...
+        'VariableNames', {'k','lower','upper','lowerImag','upperImag'});
 end
 
 function y0 = gammaValue(k, y)
