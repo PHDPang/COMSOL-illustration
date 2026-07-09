@@ -4,7 +4,7 @@
 
 clear; clc; close all;
 
-xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\Cn Symmetry\C6\Energy Band\C6 symmetry_Time Reversal_(-0.06,0.005,0.06).xlsx";
+xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\Cn Symmetry\C6\Energy Band\C6 symmetry_Reciprocity_(-0.06,0.005,0.06).xlsx";
 outDir = fullfile(pwd, "outputs");
 % 若输出目录不存在则自动创建。
 if ~exist(outDir, "dir")
@@ -85,8 +85,8 @@ red = [0.95, 0.05, 0.05];
 blue = [0.05, 0.15, 0.95];
 gray = [0.45, 0.45, 0.45];
 
-hDelta0 = scatter(ax, band0.k, band0.upper, 18, black, 'filled');
-scatter(ax, band0.k, band0.lower, 18, black, 'filled', ...
+hDelta0 = scatter(ax, band0.k, band0.upper, 42, black, 'p', 'filled');
+scatter(ax, band0.k, band0.lower, 42, black, 'p', 'filled', ...
     'HandleVisibility', 'off');
 hUpper = scatter(ax, bandB.k, bandB.upper, 22, red, 'filled');
 hLower = scatter(ax, bandB.k, bandB.lower, 22, blue, 'filled');
@@ -97,7 +97,7 @@ f0Gamma = mean([gammaValue(band0.k, band0.lower), gammaValue(band0.k, band0.uppe
 fUpperGamma = gammaValue(bandB.k, bandB.upper);
 fLowerGamma = gammaValue(bandB.k, bandB.lower);
 
-plot(ax, kGamma, f0Gamma, 'o', 'MarkerSize', 5.5, ...
+plot(ax, kGamma, f0Gamma, 'p', 'MarkerSize', 7.0, ...
     'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
 plot(ax, kGamma, fUpperGamma, 'o', 'MarkerSize', 5.5, ...
     'MarkerFaceColor', red, 'MarkerEdgeColor', red);
@@ -175,17 +175,17 @@ try
 catch
 end
 
-hImagDelta0 = scatter(axImag, imagBand0.k, imagBand0.upper, 18, black, 'filled');
-scatter(axImag, imagBand0.k, imagBand0.lower, 18, black, 'filled', ...
+hImagDelta0 = scatter(axImag, imagBand0.k, imagBand0.upper, 42, black, 'p', 'filled');
+scatter(axImag, imagBand0.k, imagBand0.lower, 42, black, 'p', 'filled', ...
     'HandleVisibility', 'off');
 hImagUpper = scatter(axImag, imagBandB.k, imagBandB.upper, 22, red, 'filled');
 hImagLower = scatter(axImag, imagBandB.k, imagBandB.lower, 22, blue, 'filled');
 
 % 标记 Gamma 点处各模式的原始虚部。
-plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.upper), 'o', ...
-    'MarkerSize', 5.5, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
-plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.lower), 'o', ...
-    'MarkerSize', 5.5, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
+plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.upper), 'p', ...
+    'MarkerSize', 7.0, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
+plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.lower), 'p', ...
+    'MarkerSize', 7.0, 'MarkerFaceColor', gray, 'MarkerEdgeColor', gray);
 plot(axImag, kGamma, gammaValue(imagBandB.k, imagBandB.upper), 'o', ...
     'MarkerSize', 5.5, 'MarkerFaceColor', red, 'MarkerEdgeColor', red);
 plot(axImag, kGamma, gammaValue(imagBandB.k, imagBandB.lower), 'o', ...
