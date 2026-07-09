@@ -1,22 +1,19 @@
 %% 根据 COMSOL 本征频率扫描结果绘制复本征频率的实部和虚部
 % 数据列：1-delta，2-k/ratio，3-复本征频率，4-Q，5~8-S0~S3。
-% 对每个固定的 (delta, k) 扫描点，选取第 5、6 个本征解作为目标模式。
+% 对每个固定的 (delta, k) 扫描点，选取第 2、3 个本征解作为目标模式。
 
 clear; clc; close all;
 
-xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\S2n Symmetry\S6 Symmetry\Band Structure\Continuous\Nonreciprocity,delta=0&0.08,k=(-0.04,0.04,length=0.005).xlsx";
+xlsxPath = "E:\Pang\Project\2025_11\Degeneracy\Data\Cn Symmetry\C6\Energy Band\C6 symmetry_Time Reversal_(-0.06,0.005,0.06).xlsx";
 outDir = fullfile(pwd, "outputs");
 % 若输出目录不存在则自动创建。
 if ~exist(outDir, "dir")
     mkdir(outDir);
 end
 
-modePair = [5, 6];       % 每个 (delta, k) 数据块内的本征模式序号
+modePair = [2, 3];       % 每个 (delta, k) 数据块内的本征模式序号
 delta0 = 0;
 deltaB = 0.08;
-c_const = 299792458;     % 真空光速，单位：m/s
-lattice = 840e-9;        % 晶格常数，单位：m
-f0 = c_const / lattice / 1e12;  % 归一化频率，单位：THz
 
 % 读取原始单元格，并删除整行为空的数据。
 raw = readcell(xlsxPath);
@@ -60,24 +57,11 @@ fprintf("delta = %.3g, k = 0: lower = %.6f, upper = %.6f, splitting = %.6f\n", .
     deltaB, gammaValue(bandB.k, bandB.lower), gammaValue(bandB.k, bandB.upper), ...
     gammaValue(bandB.k, bandB.upper) - gammaValue(bandB.k, bandB.lower));
 
-% 保留本征频率虚部的原始 THz 数据，不进行归一化。
+% 保留本征频率虚部的原始数据，不进行归一化。
 imagBand0 = table(band0.k, band0.lowerImag, band0.upperImag, ...
     'VariableNames', {'k','lower','upper'});
 imagBandB = table(bandB.k, bandB.lowerImag, bandB.upperImag, ...
     'VariableNames', {'k','lower','upper'});
-
-% 将频率除以 f0，后续绘图统一使用无量纲频率。
-band0.lower = band0.lower / f0;
-band0.upper = band0.upper / f0;
-bandB.lower = bandB.lower / f0;
-bandB.upper = bandB.upper / f0;
-
-% 仅对绘图曲线进行保形插值，避免改变原始数据及其物理含义。
-interpFactor = 10;
-plotBand0 = interpolateBandForPlot(band0, interpFactor);
-plotBandB = interpolateBandForPlot(bandB, interpFactor);
-plotImagBand0 = interpolateBandForPlot(imagBand0, interpFactor);
-plotImagBandB = interpolateBandForPlot(imagBandB, interpFactor);
 
 fig = figure(1);
 set(fig, 'Name', 'Real part (a)', 'NumberTitle', 'off', ...
@@ -101,11 +85,11 @@ red = [0.95, 0.05, 0.05];
 blue = [0.05, 0.15, 0.95];
 gray = [0.45, 0.45, 0.45];
 
-hDelta0 = plot(ax, plotBand0.k, plotBand0.upper, '-', 'Color', black, 'LineWidth', 1.05);
-plot(ax, plotBand0.k, plotBand0.lower, '-', 'Color', black, 'LineWidth', 1.05, ...
+hDelta0 = scatter(ax, band0.k, band0.upper, 18, black, 'filled');
+scatter(ax, band0.k, band0.lower, 18, black, 'filled', ...
     'HandleVisibility', 'off');
-hUpper = plot(ax, plotBandB.k, plotBandB.upper, '-', 'Color', red, 'LineWidth', 1.35);
-hLower = plot(ax, plotBandB.k, plotBandB.lower, '-', 'Color', blue, 'LineWidth', 1.35);
+hUpper = scatter(ax, bandB.k, bandB.upper, 22, red, 'filled');
+hLower = scatter(ax, bandB.k, bandB.lower, 22, blue, 'filled');
 
 % 提取并标记 Gamma 点处的简并位置及分裂后的上下支。
 kGamma = 0;
@@ -153,7 +137,7 @@ ax.XTickLabel = xTickLabels;
 ax.TickLabelInterpreter = 'tex';
 
 xlabel(ax, 'k (2\pi/a)', 'FontName', 'Arial', 'FontSize', 9);
-ylabel(ax, 'f/f_0', 'FontName', 'Arial', 'FontSize', 9);
+ylabel(ax, 'Re(\omega) (Hz)', 'FontName', 'Arial', 'FontSize', 9);
 
 leg = legend(ax, [hDelta0, hUpper, hLower], ...
     {'\delta = 0', 'Upper band, \delta = 0.08', 'Lower band, \delta = 0.08'}, ...
@@ -166,8 +150,8 @@ text(ax, 0.02, 0.94, '(a)', 'Units', 'normalized', ...
     'FontName', 'Arial', 'FontWeight', 'bold', 'FontSize', 10);
 
 % 同时导出高分辨率 PNG 和矢量 PDF。
-pngPath = fullfile(outDir, "fig2a_real_upper_lower_bands_matlab.png");
-pdfPath = fullfile(outDir, "fig2a_real_upper_lower_bands_matlab.pdf");
+pngPath = fullfile(outDir, "fig2a_real_upper_lower_scatter_raw_matlab.png");
+pdfPath = fullfile(outDir, "fig2a_real_upper_lower_scatter_raw_matlab.pdf");
 exportgraphics(fig, pngPath, 'Resolution', 600);
 set(fig, 'Renderer', 'painters');
 print(fig, pdfPath, '-dpdf', '-painters');
@@ -191,14 +175,11 @@ try
 catch
 end
 
-hImagDelta0 = plot(axImag, plotImagBand0.k, plotImagBand0.upper, '-', ...
-    'Color', black, 'LineWidth', 1.05);
-plot(axImag, plotImagBand0.k, plotImagBand0.lower, '-', ...
-    'Color', black, 'LineWidth', 1.05, 'HandleVisibility', 'off');
-hImagUpper = plot(axImag, plotImagBandB.k, plotImagBandB.upper, '-', ...
-    'Color', red, 'LineWidth', 1.35);
-hImagLower = plot(axImag, plotImagBandB.k, plotImagBandB.lower, '-', ...
-    'Color', blue, 'LineWidth', 1.35);
+hImagDelta0 = scatter(axImag, imagBand0.k, imagBand0.upper, 18, black, 'filled');
+scatter(axImag, imagBand0.k, imagBand0.lower, 18, black, 'filled', ...
+    'HandleVisibility', 'off');
+hImagUpper = scatter(axImag, imagBandB.k, imagBandB.upper, 22, red, 'filled');
+hImagLower = scatter(axImag, imagBandB.k, imagBandB.lower, 22, blue, 'filled');
 
 % 标记 Gamma 点处各模式的原始虚部。
 plot(axImag, kGamma, gammaValue(imagBand0.k, imagBand0.upper), 'o', ...
@@ -230,7 +211,7 @@ axImag.XTickLabel = xTickLabels;
 axImag.TickLabelInterpreter = 'tex';
 
 xlabel(axImag, 'k (2\pi/a)', 'FontName', 'Arial', 'FontSize', 9);
-ylabel(axImag, 'Im(f) (THz)', 'FontName', 'Arial', 'FontSize', 9);
+ylabel(axImag, 'Im(\omega) (Hz)', 'FontName', 'Arial', 'FontSize', 9);
 
 legImag = legend(axImag, [hImagDelta0, hImagUpper, hImagLower], ...
     {'\delta = 0', 'Upper band, \delta = 0.08', 'Lower band, \delta = 0.08'}, ...
@@ -242,24 +223,14 @@ legImag.FontSize = 7;
 text(axImag, 0.02, 0.94, '(b)', 'Units', 'normalized', ...
     'FontName', 'Arial', 'FontWeight', 'bold', 'FontSize', 10);
 
-pngImagPath = fullfile(outDir, "fig2b_imag_upper_lower_bands_matlab.png");
-pdfImagPath = fullfile(outDir, "fig2b_imag_upper_lower_bands_matlab.pdf");
+pngImagPath = fullfile(outDir, "fig2b_imag_upper_lower_scatter_raw_matlab.png");
+pdfImagPath = fullfile(outDir, "fig2b_imag_upper_lower_scatter_raw_matlab.pdf");
 exportgraphics(figImag, pngImagPath, 'Resolution', 600);
 set(figImag, 'Renderer', 'painters');
 print(figImag, pdfImagPath, '-dpdf', '-painters');
 
 fprintf("Saved PNG: %s\n", pngImagPath);
 fprintf("Saved PDF: %s\n", pdfImagPath);
-
-function plotBand = interpolateBandForPlot(band, interpFactor)
-    % 使用保形分段三次插值加密横坐标，减少折线感并抑制非物理过冲。
-    pointCount = (height(band) - 1) * interpFactor + 1;
-    kFine = linspace(band.k(1), band.k(end), pointCount).';
-    lowerFine = interp1(band.k, band.lower, kFine, 'pchip');
-    upperFine = interp1(band.k, band.upper, kFine, 'pchip');
-    plotBand = table(kFine, lowerFine, upperFine, ...
-        'VariableNames', {'k','lower','upper'});
-end
 
 function band = extractBandPair(T, deltaValue, modePair)
     % 按实部划分上下支，并同步保留每条能带对应的虚部。
